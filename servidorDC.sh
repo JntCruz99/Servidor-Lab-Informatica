@@ -20,29 +20,35 @@ USUARIO_ALUNO="aluno"
 SENHA_ALUNO="senhaaluno"
 
 # Configuração do Samba
-echo "[global]
+cat <<EOL >> /etc/samba/smb.conf
+[global]
    workgroup = $DOMINIO
    netbios name = $NOME_SERVIDOR
    server role = active directory domain controller
    dns forwarder = 8.8.8.8
-   idmap_ldb:use rfc2307 = yes" >> /etc/samba/smb.conf
+   idmap_ldb:use rfc2307 = yes
+EOL
 
 # Reinicia o serviço Samba
-systemctl restart smbd
+systemctl restart samba-ad-dc
 
-# Configura as interfaces de rede (substitua eth0 e eth1 pelos nomes de suas interfaces)
-echo "auto eth0
-iface eth0 inet dhcp" > /etc/network/interfaces
+# Configura as interfaces de rede usando Netplan
+cat <<EOL > /etc/netplan/01-netcfg.yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: yes
+    eth1:
+      addresses: [192.168.1.1/24]
+EOL
 
-echo "auto eth1
-iface eth1 inet static
-    address 192.168.1.1
-    netmask 255.255.255.0" >> /etc/network/interfaces
-
-# Reinicia as interfaces de rede
-systemctl restart networking
+# Aplica as configurações de rede
+netplan apply
 
 # Adiciona o usuário "suporte" como administrador do domínio
+samba-tool group add "Domain Admins"
 samba-tool user add $USUARIO_ADMIN $SENHA_USUARIO_ADMIN --given-name="Suporte" --surname="Administrador"
 samba-tool group addmembers "Domain Admins" $USUARIO_ADMIN
 
@@ -50,6 +56,6 @@ samba-tool group addmembers "Domain Admins" $USUARIO_ADMIN
 samba-tool user add $USUARIO_ALUNO $SENHA_ALUNO --given-name="Aluno" --surname="Sobrenome"
 
 # Reinicia o serviço Samba após adicionar usuários
-systemctl restart smbd
+systemctl restart samba-ad-dc
 
 echo "Configuração concluída. O controlador de domínio Samba está pronto para uso. Usuários adicionados."
