@@ -1,61 +1,44 @@
 #!/bin/bash
 
-# Verifica se o script está sendo executado com permissões de superusuário
-if [ "$EUID" -ne 0 ]; then
-    echo "Este script precisa ser executado como superusuário (root)."
-    exit 1
-fi
+# Instale o Samba
+sudo apt install samba
 
-# Instala o Samba
-apt-get update
-apt-get install -y samba
+# Configure a placa de rede da Internet
+sudo ifconfig eth0 192.168.1.1 netmask 255.255.255.0
 
-# Define variáveis de configuração
-DOMINIO="labinformatica.fesvip"
-NOME_SERVIDOR="servidorLab"
-SENHA_ADMIN="jonatafesvip"
-USUARIO_ADMIN="suporte"
-SENHA_USUARIO_ADMIN="jonatafesvip"
-USUARIO_ALUNO="aluno"
-SENHA_ALUNO="senhaaluno"
+# Configure a placa de rede da rede local
+sudo ifconfig eth1 10.0.0.1 netmask 255.255.255.0
 
-# Configuração do Samba
-cat <<EOL >> /etc/samba/smb.conf
+# Edite o arquivo de configuração do Samba
+sudo nano /etc/samba/smb.conf
+
+# Adicione as seguintes linhas:
+
 [global]
-   workgroup = $DOMINIO
-   netbios name = $NOME_SERVIDOR
-   server role = active directory domain controller
-   dns forwarder = 8.8.8.8
-   idmap_ldb:use rfc2307 = yes
-EOL
+workgroup = labfesvip
+netbios name = servidorcd
+server string = Servidor Samba
 
-# Reinicia o serviço Samba
-systemctl restart samba-ad-dc
+security = user
 
-# Configura as interfaces de rede usando Netplan
-cat <<EOL > /etc/netplan/01-netcfg.yaml
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    eth0:
-      dhcp4: yes
-    eth1:
-      addresses: [192.168.1.1/24]
-EOL
+realm = labfesvip
 
-# Aplica as configurações de rede
-netplan apply
+interfaces = lo eth0 eth1
 
-# Adiciona o usuário "suporte" como administrador do domínio
-samba-tool group add "Domain Admins"
-samba-tool user add $USUARIO_ADMIN $SENHA_USUARIO_ADMIN --given-name="Suporte" --surname="Administrador"
-samba-tool group addmembers "Domain Admins" $USUARIO_ADMIN
+domain master = yes
+preferred master = yes
+local master = yes
+domain logons = yes
+logon script = netlogon
 
-# Adiciona o usuário "aluno" ao domínio sem privilégios de administrador
-samba-tool user add $USUARIO_ALUNO $SENHA_ALUNO --given-name="Aluno" --surname="Sobrenome"
+# Salve e feche o arquivo
 
-# Reinicia o serviço Samba após adicionar usuários
-systemctl restart samba-ad-dc
+# Reinicie o Samba
+sudo service smbd restart
 
-echo "Configuração concluída. O controlador de domínio Samba está pronto para uso. Usuários adicionados."
+# Crie um usuário administrador
+sudo smbpasswd -a administrador
+
+# Acesse o domínio
+
+net use \\servidorcd\c$ /u:administrador
