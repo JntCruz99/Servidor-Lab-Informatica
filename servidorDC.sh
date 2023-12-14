@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Instale o Samba
-sudo apt install samba
+# Instala o Samba e o DHCP
+sudo apt install samba dhcpd
 
 # Configure a placa de rede da Internet
 sudo ifconfig eth0 192.168.1.1 netmask 255.255.255.0
@@ -31,6 +31,13 @@ local master = yes
 domain logons = yes
 logon script = netlogon
 
+# Adicione as seguintes linhas no final do arquivo:
+
+host Servidor {
+  hardware ethernet 00:00:00:00:00:01;
+  fixed-address 192.168.1.1;
+}
+
 # Salve e feche o arquivo
 
 # Reinicie o Samba
@@ -38,6 +45,9 @@ sudo service smbd restart
 
 # Crie um usuário administrador
 sudo smbpasswd -a administrador
+
+# Crie um usuário aluno
+sudo smbpasswd -a aluno
 
 # Acesse o domínio
 
